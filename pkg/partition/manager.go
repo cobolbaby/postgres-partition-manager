@@ -10,7 +10,7 @@ package partition
 	// -- 依赖 ::regclass
 	SELECT
 		i.inhparent::regclass AS parent_name,
-		t.inhrelid::regclass AS part_name,
+		i.inhrelid::regclass AS part_name,
 		pg_get_expr(t.relpartbound, t.oid) AS part_expr
 	FROM pg_inherits AS i
 	JOIN pg_class AS t ON t.oid = i.inhrelid
@@ -105,6 +105,66 @@ package partition
 		part_end < CURRENT_DATE - '7 days'::interval;
 		and part_name !~* 'his$';
 	-- 变量是 表名 ictf3.ictlogtestpart_ao 和 过期定义 7 day，但得刨去默认分区
+
+*/
+
+/*
+	GP 分区管理机制
+
+	// 查看所有分区表
+	SELECT parrelid::regclass,
+	CASE WHEN parkind = 'r' THEN 'range'
+		 ELSE 'list'
+	END
+	FROM pg_partition;
+
+	// 查看某张表的所有子分区以及子分区定义
+	SELECT
+		i.inhparent::regclass AS parent_name,
+		i.inhrelid::regclass AS part_name,
+		pg_get_expr(pr1.parrangestart, pr1.parchildrelid) pstart,
+		pg_get_expr(pr1.parrangeend, pr1.parchildrelid) pend,
+		pg_get_expr(pr1.parrangeevery, pr1.parchildrelid) pduration
+	FROM pg_inherits AS i
+	JOIN pg_partition_rule AS pr1 ON i.inhrelid = pr1.parchildrelid
+	WHERE i.inhparent = 'ict.ictlogtestpart_ao'::regclass;
+
+	// SQL工具脚本，参考如下连接改造
+	// TODO:需要将'2030-12-24 00:00:00'::timestamp without time zone 文本转化为 timestamp 类型
+	WITH q_last_part AS (
+		select
+			*,
+			pend as last_part_end
+		from
+			(
+				SELECT
+					i.inhparent::regclass AS parent_name,
+					i.inhrelid::regclass AS part_name,
+					pg_get_expr(pr1.parrangestart, pr1.parchildrelid) pstart,
+					pg_get_expr(pr1.parrangeend, pr1.parchildrelid) pend,
+					pg_get_expr(pr1.parrangeevery, pr1.parchildrelid) pduration
+				FROM pg_inherits AS i
+				JOIN pg_partition_rule AS pr1 ON i.inhrelid = pr1.parchildrelid
+				WHERE i.inhparent = 'ict.ictlogtestpart_ao'::regclass
+			) x
+		order by
+			last_part_end desc
+		limit
+			1
+	)
+	SELECT
+		format(
+			$$CREATE TABLE IF NOT EXISTS %s_%s%s%s PARTITION OF %s FOR VALUES FROM ('%s') TO ('%s')$$,
+			parent_name,
+			extract(year from last_part_end),
+			lpad((extract(month from last_part_end))::text, 2, '0'),
+			lpad((extract(day from last_part_end))::text, 2, '0'),
+			parent_name,
+			last_part_end,
+			last_part_end + '7 day' :: interval
+		) AS sql_to_exec
+	FROM
+		q_last_part;
 
 */
 
