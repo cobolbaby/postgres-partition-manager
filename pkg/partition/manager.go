@@ -171,19 +171,20 @@ package partition
 /*
     PG 分区归档操作
 
-	// 切换 TableSpace
+	// 切换 TableSpace，存储空间不变
 	psql ${database} -c "ALTER TABLE ictf3.ictlogtestpart_ao_20211202 SET TABLESPACE ictf3_archive;"
 
 	// 同步到数仓 GP
 	psql ${database} -c "copy (SELECT * FROM ictf3.ictlogtestpart_ao_20211202) to stdout" \
 	| psql -h ${host} -p ${port} -U ${user} -d ${database} -c "copy ict.ictlogtestpart_ao from stdin"
 
-	// 数据备份成文件
+	// 备份数据到本地文件，压缩保存
 	pg_dump -Fc ${database} -t ictf3.ictlogtestpart_ao_20211202 > ${archive_path}/ictf3_ictlogtestpart_ao_20211202.dump
 
-	// 归档到 S3
-	mc cp --recursive ${archive_path}/${schema}.${tbl_part}.dump minio/${archive_s3_bucket}/${archive_s3_path}/${archive_subdir}/
-	// mc 可否支持 stdin 和 stdout，从而避免落盘
+	// 备份数据到 S3
+	// mc cp ${archive_path}/${schema}.${tbl_part}.dump minio/${archive_s3_bucket}/${archive_s3_path}/${archive_subdir}/
+	// mc 支持 stdin 和 stdout，从而避免落盘
+	pg_dump -Fc ${database} -t ictf3.ictlogtestpart_ao_20211202 | mc pipe minio/${archive_s3_bucket}/${archive_s3_path}/${archive_subdir}/ictf3_ictlogtestpart_ao_20211202.dump
 
 	// 归档之后删除数据
 	psql ${database} -c "drop table ictf3.ictlogtestpart_ao_20211202"
