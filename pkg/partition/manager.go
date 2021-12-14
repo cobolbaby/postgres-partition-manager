@@ -170,6 +170,10 @@ package partition
 
 /*
     PG 分区归档操作
+	export PGHOST=???
+	export PGPORT=???
+	export PGUSER=???
+	export PGPASSWORD=???
 
 	// 切换 TableSpace，存储空间不变
 	psql ${database} -c "ALTER TABLE ictf3.ictlogtestpart_ao_20211202 SET TABLESPACE ictf3_archive;"
@@ -184,6 +188,7 @@ package partition
 	// 备份数据到 S3
 	// mc cp ${archive_path}/${schema}.${tbl_part}.dump minio/${archive_s3_bucket}/${archive_s3_path}/${archive_subdir}/
 	// mc 支持 stdin 和 stdout，从而避免落盘
+	export MC_HOST_minio="http://???:???@???"
 	pg_dump -Fc ${database} -t ictf3.ictlogtestpart_ao_20211202 | mc pipe minio/${archive_s3_bucket}/${archive_s3_path}/${archive_subdir}/ictf3_ictlogtestpart_ao_20211202.dump
 
 	// 归档之后删除数据
